@@ -1,6 +1,7 @@
 import argparse
 import json
 import base64
+from typing import TypedDict
 
 import qrcode
 from cryptography.hazmat.primitives.asymmetric import rsa
@@ -9,43 +10,53 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 
 
-def writeJsonToQrCode(data: dict[str, any], file_path: str):
+class Keypair(TypedDict):
+    private_key: str
+    public_key: str
+
+class SignedData(TypedDict):
+    keyname: str
+    data: str
+    b64_signature: str
+
+
+def write_json_to_qrcode(data: SignedData, file_path: str):
     print(f'Writing to qr code file "{file_path}".')
     img = qrcode.make(data)
     img.save(file_path)
 
-def writeJsonToFile(data: dict[str, any], file_path):
+def write_json_to_file(data: SignedData | dict[str, Keypair], file_path: str):
     print(f'Writing to json file "{file_path}".')
     with open(file_path, "w") as file:
         file.write(json.dumps(data))
 
-def readJsonFromFile(file_path: str):
+def read_json_from_file(file_path: str):
     print(f'Reading json from file "{file_path}".')
     with open(file_path, "r") as file:
         return json.load(file)
 
 class Keypairs:
     def __init__(self):
-        self.keypairs = {}
+        self.keypairs: dict[str, Keypair] = {}
 
-    def readFromJson(self, file_path: str):
+    def read_from_json(self, file_path: str):
         print(f'Reading keypairs.')
         try:
-            self.keypairs = readJsonFromFile(file_path)
+            self.keypairs = read_json_from_file(file_path)
         except IOError:
             self.keypairs = {}
             print(f'"{file_path}" does not exist, using empty Keypairs.')
 
-    def writeToJson(self, file_path: str):
+    def write_to_json(self, file_path: str):
         print(f'Serializing keypairs.')
-        writeJsonToFile(self.keypairs, file_path)
+        write_json_to_file(self.keypairs, file_path)
         
-    def sign(self, keyname: str, private_key_pass: str, data: str):
+    def sign(self, keyname: str, private_key_pass: str, data: str) -> SignedData:
         print(f'Signing data "{data}" with key "{keyname}".')
-        result ={
+        result : SignedData = {
             'data': data,
-            'keyname': None,
-            'b64_signature': None
+            'keyname': "",
+            'b64_signature': ""
         }
 
         if keyname not in self.keypairs:
@@ -57,13 +68,13 @@ class Keypairs:
                     password=private_key_pass.encode()
                 )
 
-                signature = private_key.sign(
+                signature = private_key.sign( # type: ignore
                     data.encode(),
                     padding.PSS(
                         mgf=padding.MGF1(hashes.SHA256()),
                         salt_length=padding.PSS.MAX_LENGTH
-                    ),
-                    hashes.SHA256()
+                    ), # type: ignore
+                    hashes.SHA256() # type: ignore
                 )
 
                 result['b64_signature'] = base64.b64encode(signature).decode()
@@ -74,7 +85,8 @@ class Keypairs:
             
         return result
     
-    def verify(self, signed_data):
+
+    def verify(self, signed_data: SignedData) -> bool:
         keyname = signed_data["keyname"]
         data = signed_data["data"]
         b64_signature = signed_data["b64_signature"]
@@ -88,14 +100,14 @@ class Keypairs:
                 public_key = serialization.load_pem_public_key(self.keypairs[keyname]['public_key'].encode())
                 signature = base64.b64decode(b64_signature)
 
-                public_key.verify(
+                public_key.verify( # type: ignore
                     signature,
                     data.encode(),
                     padding.PSS(
                         mgf=padding.MGF1(hashes.SHA256()),
                         salt_length=padding.PSS.MAX_LENGTH
-                    ),
-                    hashes.SHA256()
+                    ), # type: ignore
+                    hashes.SHA256() # type: ignore
                 )
 
                 print(f'Verification sucessful.')
@@ -105,7 +117,7 @@ class Keypairs:
             
         return False
 
-    def generateNewKeypair(self, keyname: str, private_key_pass: str):
+    def generate_new_keypair(self, keyname: str, private_key_pass: str):
         print(f'Generating new Keypair "{keyname}"')
 
         if keyname in self.keypairs:
@@ -135,57 +147,92 @@ class Keypairs:
 
 def parse_args():
     parser = argparse.ArgumentParser(prog='Nil StudentInnenkeller Key and Certificate Generator', description='Generate Keypairs and Certificates for Nil Membership Cards', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--keypairs', help='The file where you store generated keypairs.', default='./keypairs.json')
+    parser.add_argument('--keypairs_file', help='The file where you store generated keypairs.', default='./keypairs.json')
     subparsers = parser.add_subparsers(help='Mode Options', dest='command')
     subparsers.required = True
 
     parser_keygen = subparsers.add_parser('keygen', help='Generate a new Keypair')
-    parser_keygen.add_argument('-n', '--name', help='New Keypair Name', required=True)
+    parser_keygen.add_argument('-n', '--keyname', help='New Keypair Name', required=True)
     parser_keygen.add_argument('-p', '--password', help='New Keypair Password', required=True)
 
     parser_keygen = subparsers.add_parser('signJson', help='Sign data and save as json file')
-    parser_keygen.add_argument('-n', '--name', help='Keypair name to sign data with', required=True)
+    parser_keygen.add_argument('-n', '--keyname', help='Keypair name to sign data with', required=True)
     parser_keygen.add_argument('-p', "--password", help='Password for keypair', required=True)
     parser_keygen.add_argument('-m', "--message", help='Message to be signed', required=True)
-    parser_keygen.add_argument('-o', "--output", help='Output json file for signed data', required=True)
+    parser_keygen.add_argument('-o', "--output_file", help='Output json file for signed data', required=True)
 
     parser_keygen = subparsers.add_parser('signQrCode', help='Sign data and save as qr code png file')
-    parser_keygen.add_argument('-n', '--name', help='Keypair Name to sign data with', required=True)
+    parser_keygen.add_argument('-n', '--keyname', help='Keypair Name to sign data with', required=True)
     parser_keygen.add_argument('-p', "--password", help='Password for keypair', required=True)
     parser_keygen.add_argument('-m', "--message", help='Message to be signed', required=True)
-    parser_keygen.add_argument('-o', "--output", help='Output png file for qr code with signed data', required=True)
+    parser_keygen.add_argument('-o', "--output_file", help='Output png file for qr code with signed data', required=True)
 
     parser_keygen = subparsers.add_parser('verifyJson', help='Verify saved and signed message in json format')
-    parser_keygen.add_argument('-i', "--input", help='Input json file with signed data', required=True)
+    parser_keygen.add_argument('-i', "--input_file", help='Input json file with signed data', required=True)
 
     args = parser.parse_args()
     return args
 
-def run(args):
-    config = vars(args)
 
+class Command(TypedDict):
+    keypairs_file: str
+
+class KeygenCommand(Command):
+    keyname: str
+    password: str
+
+class SignJsonCommand(Command):
+    keyname: str
+    password: str
+    message: str
+    output_file: str
+
+class SignQrCodeCommand(Command):
+    keyname: str
+    password: str
+    message: str
+    output_file: str
+
+class VerifyJsonCommand(Command):
+    input_file: str
+
+
+def run_keygen(command: KeygenCommand):
     keypairs = Keypairs()
-    keypairs.readFromJson(config['keypairs'])
+    keypairs.read_from_json(command["keypairs_file"])
+    keypairs.generate_new_keypair(command["keyname"], command['password'])
+    keypairs.write_to_json(command["keypairs_file"])
 
-    if config['command'] == 'keygen':
-        keypairs.generateNewKeypair(config['name'], config['password'])
-        keypairs.writeToJson(config['keypairs'])
+def run_signJson(command: SignJsonCommand):
+    keypairs = Keypairs()
+    keypairs.read_from_json(command["keypairs_file"])
+    signed_data = keypairs.sign(command['keyname'], command['password'], command["message"])
+    write_json_to_file(signed_data, command['output_file'])
 
-    elif config['command'] == 'signJson':
-        signed_data = keypairs.sign(config['name'], config['password'], config["message"])
-        writeJsonToFile(signed_data, config['output'])
+def run_signQrCode(command: SignQrCodeCommand):
+    keypairs = Keypairs()
+    keypairs.read_from_json(command["keypairs_file"])
+    signed_data = keypairs.sign(command['keyname'], command['password'], command["message"])
+    write_json_to_qrcode(signed_data, command['output_file'])
 
-    elif config['command'] == 'signQrCode':
-        signed_data = keypairs.sign(config['name'], config['password'], config["message"])
-        writeJsonToQrCode(signed_data, config['output'])
+def run_verifyJson(command: VerifyJsonCommand):
+    keypairs = Keypairs()
+    keypairs.read_from_json(command["keypairs_file"])
+    signed_data = read_json_from_file(command['input_file'])
+    keypairs.verify(signed_data)
 
-    elif config['command'] == 'verifyJson':
-        signed_data = readJsonFromFile(config['input'])
-        keypairs.verify(signed_data)
+def run_command(args: dict):
+    {
+        "keygen": lambda: run_keygen(KeygenCommand(**args)),
+        "signJson": lambda: run_signJson(SignJsonCommand(**args)),
+        "signQrCode": lambda: run_signQrCode(SignQrCodeCommand(**args)),
+        "verifyJson": lambda: run_verifyJson(VerifyJsonCommand(**args)),
+    }.get(args.get("command", ""), lambda: None)()
+
 
 def main():
-    args = parse_args()
-    run(args)
+    args = vars(parse_args())
+    run_command(args)
 
 
 if __name__ == '__main__':
