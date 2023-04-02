@@ -2,22 +2,24 @@ import argparse
 import json
 import base64
 
+import qrcode
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 
 
-def writeJsonToQrCode(data, file_path):
+def writeJsonToQrCode(data: str, file_path: str):
     print(f'Writing to qr code file "{file_path}".')
-    # TODO
+    img = qrcode.make(data)
+    img.save(file_path)
 
-def writeJsonToFile(data, file_path):
+def writeJsonToFile(data: str, file_path):
     print(f'Writing to json file "{file_path}".')
     with open(file_path, "w") as file:
         file.write(json.dumps(data))
 
-def readJsonFromFile(file_path):
+def readJsonFromFile(file_path: str):
     print(f'Reading json from file "{file_path}".')
     with open(file_path, "r") as file:
         return json.load(file)
