@@ -9,12 +9,12 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 
 
-def writeJsonToQrCode(data: str, file_path: str):
+def writeJsonToQrCode(data: dict[str, any], file_path: str):
     print(f'Writing to qr code file "{file_path}".')
     img = qrcode.make(data)
     img.save(file_path)
 
-def writeJsonToFile(data: str, file_path):
+def writeJsonToFile(data: dict[str, any], file_path):
     print(f'Writing to json file "{file_path}".')
     with open(file_path, "w") as file:
         file.write(json.dumps(data))
@@ -133,7 +133,7 @@ class Keypairs:
             }
 
 
-def main():
+def parse_args():
     parser = argparse.ArgumentParser(prog='Nil StudentInnenkeller Key and Certificate Generator', description='Generate Keypairs and Certificates for Nil Membership Cards', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--keypairs', help='The file where you store generated keypairs.', default='./keypairs.json')
     subparsers = parser.add_subparsers(help='Mode Options', dest='command')
@@ -159,6 +159,9 @@ def main():
     parser_keygen.add_argument('-i', "--input", help='Input json file with signed data', required=True)
 
     args = parser.parse_args()
+    return args
+
+def run(args):
     config = vars(args)
 
     keypairs = Keypairs()
@@ -179,6 +182,11 @@ def main():
     elif config['command'] == 'verifyJson':
         signed_data = readJsonFromFile(config['input'])
         keypairs.verify(signed_data)
+
+def main():
+    args = parse_args()
+    run(args)
+
 
 if __name__ == '__main__':
     main()
