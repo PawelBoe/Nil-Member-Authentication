@@ -1,8 +1,8 @@
 import argparse
 from typing import TypedDict
 
-from gui import start_gui
-from core import Keypair, read_json_from_file, write_json_to_file, write_json_to_qrcode
+from Gui import start_gui
+from Crypto import Keypair, read_json_from_file, write_json_to_file, write_json_to_qrcode
 
 
 class Command(TypedDict):

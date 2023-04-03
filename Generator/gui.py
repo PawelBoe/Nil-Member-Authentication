@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import ttk
 from datetime import date
 
-from core import Keypair, write_json_to_qrcode
+from Crypto import Keypair, write_json_to_qrcode
 
 class App(tk.Frame):
     def __init__(self, keypair: Keypair, master=None):

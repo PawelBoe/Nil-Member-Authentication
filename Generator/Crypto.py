@@ -25,7 +25,7 @@ def write_json_to_qrcode(data: SignedData, file_path: str):
         error_correction=qrcode.ERROR_CORRECT_M,
     )
     qr.add_data(data)
-    img = qr.make_image(fill_color="red", back_color="black")
+    img = qr.make_image(fill_color="black", back_color="white")
     img.save(file_path)
 
 def write_json_to_file(data: SignedData | Keydata, file_path: str):
